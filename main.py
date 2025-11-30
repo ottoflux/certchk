@@ -1,13 +1,30 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import List, Optional
 import ssl
 import socket
 import datetime
 import asyncio
+import os
 import concurrent.futures
 
 app = FastAPI(title="SSL Cert Checker")
+API_TOKEN = os.getenv("API_TOKEN", "123-please-make-your-own-better-token")
+security = HTTPBearer()
+
+# --- Security check --- yes, overly simple but sufficient for most use cases.
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    Validates the Bearer token provided in the Authorization header.
+    """
+    if credentials.credentials != API_TOKEN:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return credentials.credentials
 
 # --- Data Models ---
 class DomainRequest(BaseModel):
@@ -68,7 +85,7 @@ def get_cert_details(server: str) -> CertInfo:
 def home():
     return {"message": "SSL Checker API is ready. POST to /check"}
 
-@app.post("/check", response_model=List[CertInfo])
+@app.post("/check", response_model=List[CertInfo], dependencies=[Depends(verify_token)])
 async def check_domains(request: DomainRequest):
     loop = asyncio.get_running_loop()
 

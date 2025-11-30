@@ -1,10 +1,13 @@
 import requests
 import sys
 import json
+import os
 
 # CHANGE THIS URL to your actual Cloud URL after deployment
 # For local testing, use: http://localhost:8080/check
-API_URL = "http://localhost:8080/check"
+API_URL = "https://certchk.vercel.app/check"
+
+API_TOKEN = os.getenv("API_TOKEN", "123")
 
 def main():
     if len(sys.argv) != 2:
@@ -25,8 +28,12 @@ def main():
 
     try:
         # Send POST request to API
+        headers = {
+                    "Authorization": f"Bearer {API_TOKEN}",
+                    "Content-Type": "application/json"
+                }
         payload = {"domains": servers}
-        response = requests.post(API_URL, json=payload, timeout=30)
+        response = requests.post(API_URL, json=payload, headers=headers, timeout=30)
 
         if response.status_code == 200:
             results = response.json()
@@ -48,6 +55,10 @@ def main():
                         print(f"  >>> {status_color}Expiring soon!")
                 else:
                     print(f"{res['server']:<30} | {res['status']:<10} | {'-':<10} | {res['error_message']}")
+        elif response.status_code == 401:
+                     print("Error: Unauthorized. Please check your API_TOKEN.")
+        elif response.status_code == 403:
+                print("Error: Forbidden. Token accepted but permission denied.")
         else:
             print(f"API Error {response.status_code}: {response.text}")
 
